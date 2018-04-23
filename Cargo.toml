@@ -1,0 +1,14 @@
+[package]
+name = "rs-sboTG"
+version = "0.1.0"
+authors = ["yuyoyuppe <a.yuyoyuppe@gmail.com>"]
+
+[dependencies]
+futures = "0.1"
+tokio-core = "0.1"
+tokio-curl = "0.1.9"
+
+[dependencies.telegram-bot]
+default-features = false
+features = ["curl_connector"]
+version = "0.6.1"
