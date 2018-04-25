@@ -1,6 +1,9 @@
+extern crate chrono;
 extern crate futures;
 extern crate telegram_bot;
 extern crate tokio_core;
+
+pub mod domain_types;
 
 use std::env;
 use std::fmt::Debug;
@@ -43,15 +46,31 @@ fn test_reply(api: Api, message: Message, handle: &Handle) {
   schedule(msg.and_then(|_| chat).and_then(|_| private), handle);
 }
 
+fn show_help(api: Api, message: Message, handle: &Handle) {
+  let help_msg = api.send(message.chat.text(
+    r#"Hey there!
+You can use one of the following commands:
+/start - initiate registration process(it's just a couple of questions) 
+/stop - unregister yourself and delete ALL your data
+/list - show your feeds and their settings
+/add <atom/feed URLs> - subscribe to feeds using their URLs 
+/remove <feed IDs> - unsubscribe from feeds using their IDs
+"#
+  ));
+  schedule(help_msg, handle);
+}
+fn register_user(api: Api, message: Message, handle: &Handle) {
+  // check if we're actually rgstrd
+  // 
+}
+
 fn dispatch(api: Api, message: Message, handle: &Handle) {
   let function: fn(Api, Message, &Handle) = match message.kind {
     MessageKind::Text { ref data, .. } => match data.as_str() {
-      "/message" => test_message,
+      "/help" => test_message,
       "/reply" => test_reply,
-      unknown => {
-        println!("unknown something: {}", unknown);
-        return;
-      }
+      "/start" => register_user,
+      _ => show_help
     },
     _ => return
   };
