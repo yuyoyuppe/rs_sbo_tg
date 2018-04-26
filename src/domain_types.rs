@@ -1,14 +1,27 @@
-#![allow(dead_code)]
+extern crate telegram_bot;
 
 use chrono::prelude::{DateTime, Utc};
 use std::time::Duration;
 
+#[derive(Debug)]
 pub struct User {
-  feeds: Vec<u32>,
-  categories: Vec<u32>,
-  pub name: String,
+  pub feeds: Vec<u32>,
+  pub categories: Vec<u32>,
+  pub telegram_user_id: telegram_bot::UserId,
   pub whitelisted_words: Vec<String>,
   pub cooldown: Duration
+}
+
+impl Default for User {
+  fn default() -> User {
+    User {
+      telegram_user_id: telegram_bot::UserId::from(0),
+      feeds: Default::default(),
+      categories: Default::default(),
+      whitelisted_words: Default::default(),
+      cooldown: Default::default()
+    }
+  }
 }
 
 pub struct Feed {
