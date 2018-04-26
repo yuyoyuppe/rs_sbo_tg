@@ -2,7 +2,8 @@ extern crate telegram_bot;
 extern crate tokio_core;
 
 use domain_types::User;
-use futures::future::{err, ok};
+use futures::future::err;
+use futures::future::Either;
 
 use telegram_bot::prelude::*;
 use telegram_bot::{Api, Message, MessageKind, UpdateKind};
@@ -19,10 +20,8 @@ pub struct RssBot {
   users: HashMap<telegram_bot::UserId, User>
 }
 
-// TODO(future): rewrite when #![feature(trait_alias)] is implemented
-macro_rules! TGFuture {
-  () => { impl Future<Item = Message, Error = telegram_bot::Error> }
-}
+pub trait TGFuture: Future<Item = Message, Error = telegram_bot::Error> {}
+impl<F: Future<Item = Message, Error = telegram_bot::Error>> TGFuture for F {}
 
 impl RssBot {
   fn schedule<T, E: Debug, F: Future<Item = T, Error = E> + 'static>(f: F, handle: &Handle) {
@@ -32,7 +31,7 @@ impl RssBot {
     })
   }
 
-  fn register_user(&mut self, message: Message) -> TGFuture!() {
+  fn register_user(&mut self, message: Message) -> impl TGFuture {
     let reply = if self.users.get(&message.from.id).is_some() {
       message.text_reply("You're already registered!")
     } else {
@@ -48,7 +47,7 @@ impl RssBot {
     self.telegram_api.send(reply)
   }
 
-  fn unregister_user(&mut self, message: Message) -> TGFuture!() {
+  fn unregister_user(&mut self, message: Message) -> impl TGFuture {
     let reply = if self.users.remove(&message.from.id).is_some() {
       message.text_reply("It's painful to see you go. Godspeed you, though!")
     } else {
@@ -56,36 +55,22 @@ impl RssBot {
     };
     self.telegram_api.send(reply)
   }
-
-  fn please_authorize(&mut self, message: Message) -> TGFuture!() {
-    self
-      .telegram_api
-      .send(message.text_reply("Please authorize before sending the commands!"))
-  }
-
-  // fn authorized<F, R: Future<Item = Message, Error = telegram_bot::Error>>(
-  //   &mut self,
-  //   f: F,
-  //   message: Message
-  // ) -> F
-  // where
-  //   F: FnOnce(&mut Self, Message) -> R
-  // {
-  //   if self.users.get(&message.from.id).is_some() {
-  //     f
-  //   } else {
-  //     err(telegram_bot::Error::from("@_@"))
-  //   }
-  // }
-  fn authorized(&mut self, message: Message) -> TGFuture!() {
+  fn authorized<F, R>(&mut self, f: F, message: Message) -> Either<impl TGFuture, impl TGFuture>
+  where
+    F: FnOnce(&mut Self, Message) -> R,
+    R: TGFuture
+  {
     if self.users.get(&message.from.id).is_some() {
-      ok(message)
+      Either::A(f(self, message))
     } else {
-      err(telegram_bot::Error::from(""))
+      let api = self.telegram_api.clone();
+      Either::B(err(telegram_bot::Error::from("")).or_else(move |_| {
+        api.send(message.text_reply("Please authorize before sending this command!"))
+      }))
     }
   }
 
-  fn show_help(&mut self, message: Message) -> TGFuture!() {
+  fn show_help(&mut self, message: Message) -> impl TGFuture {
     self.telegram_api.send(message.chat.text(
       r#"Hey there!
     You can use one of the following commands:
@@ -115,21 +100,19 @@ impl RssBot {
       },
       _ => Command::Help
     };
-    let vseok = self.telegram_api.send(message.chat.text("VSE NORM"));
-    let vsebad = self.telegram_api.send(message.chat.text("VSE PLOHO"));
-
-    /*
+    let tg = self.telegram_api.clone();
+    let msg = message.clone();
     let test = self
-      .authorized(message.clone())
-      .or_else(|m| self.please_authorize(message.clone()))
-      .and_then(|m| vseok)
-      ;
-    */
+      .authorized(RssBot::show_help, message.clone())
+      .or_else(move |e| tg.send(msg.text_reply("Test")));
     match command {
       Command::Help => RssBot::schedule(self.show_help(message), &self.reactor_handle),
       Command::Start => RssBot::schedule(self.register_user(message), &self.reactor_handle),
       Command::Stop => RssBot::schedule(self.unregister_user(message), &self.reactor_handle),
-      Command::Add => RssBot::schedule(self.unregister_user(message), &self.reactor_handle) /*RssBot::schedule(test, &self.reactor_handle)*/
+      Command::Add => RssBot::schedule(
+        self.authorized(RssBot::show_help, message),
+        &self.reactor_handle
+      )
     }
   }
 
