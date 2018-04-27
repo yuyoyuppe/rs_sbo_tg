@@ -3,8 +3,10 @@
 
 extern crate chrono;
 extern crate futures;
+extern crate quick_xml;
 extern crate telegram_bot;
 extern crate tokio_core;
+extern crate url;
 
 mod domain_types;
 pub mod rss_bot;

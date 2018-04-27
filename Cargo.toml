@@ -6,10 +6,15 @@ authors = ["yuyoyuppe <a.yuyoyuppe@gmail.com>"]
 [dependencies]
 futures = "0.1"
 tokio-core = "0.1"
-tokio-curl = "0.1.9"
+tokio-curl = "0.1"
 chrono = { version = "0.4", features = ["serde"] }
+quick-xml = "0.12"
+curl = "0.4"
+url = "1.7"
 
 [dependencies.telegram-bot]
 default-features = false
 features = ["curl_connector"]
-version = "0.6.1"
+version = "0.6"
+git = "https://github.com/yuyoyuppe/telegram-bot"
+branch = "messageentity-fix"
