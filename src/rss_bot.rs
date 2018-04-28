@@ -67,9 +67,9 @@ impl RssBot {
       _ => Command::Help
     };
     match command {
-      Command::Help => RssBot::schedule(self.show_help(message), &self.reactor_handle),
-      Command::Start => RssBot::schedule(self.register_user(message), &self.reactor_handle),
-      Command::Stop => RssBot::schedule(self.unregister_user(message), &self.reactor_handle),
+      Command::Help => RssBot::schedule(self.show_help(&message), &self.reactor_handle),
+      Command::Start => RssBot::schedule(self.register_user(&message), &self.reactor_handle),
+      Command::Stop => RssBot::schedule(self.unregister_user(&message), &self.reactor_handle),
       Command::Add => RssBot::schedule(self.authorized(RssBot::add_feed, message), &self.reactor_handle)
     }
   }
@@ -113,7 +113,7 @@ impl RssBot {
       .send(message.chat.text(reply).parse_mode(ParseMode::Markdown))
   }
 
-  fn show_help(&mut self, message: Message) -> impl TGFuture {
+  fn show_help(&mut self, message: &Message) -> impl TGFuture {
     self.telegram_api.send(
       message
         .chat
@@ -147,7 +147,7 @@ You can use one of the following commands:
     }
   }
 
-  fn unregister_user(&mut self, message: Message) -> impl TGFuture {
+  fn unregister_user(&mut self, message: &Message) -> impl TGFuture {
     let reply = if self.users.remove(&message.from.id).is_some() {
       message.text_reply("It's painful to see you go. Godspeed you, though!")
     } else {
@@ -156,7 +156,7 @@ You can use one of the following commands:
     self.telegram_api.send(reply)
   }
 
-  fn register_user(&mut self, message: Message) -> impl TGFuture {
+  fn register_user(&mut self, message: &Message) -> impl TGFuture {
     let mut reply = if self.users.get(&message.from.id).is_some() {
       message.text_reply("You're already registered!")
     } else {
