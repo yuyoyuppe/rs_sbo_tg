@@ -1,4 +1,4 @@
-#![allow(dead_code, unused_variables, unused_macros)]
+#![allow(unknown_lints, dead_code, unused_variables, unused_macros)]
 #![feature(concat_idents)]
 
 extern crate chrono;
@@ -11,6 +11,9 @@ extern crate url;
 mod domain_types;
 pub mod rss_bot;
 
+use chrono::{naive::NaiveDateTime,
+             prelude::{FixedOffset, Utc},
+             DateTime};
 use rss_bot::RssBot;
 use std::env;
 
@@ -52,23 +55,46 @@ fn download_test_feeds() {
 
 use quick_xml::{events::Event, Reader};
 
-fn parse_some_xml() {
+#[derive(Debug)]
+pub struct FeedItem {
+  pub title:            String,
+  pub url:              String,
+  pub publication_date: DateTime<Utc>
+}
+
+impl Default for FeedItem {
+  fn default() -> Self {
+    FeedItem {
+      title:            Default::default(),
+      url:              Default::default(),
+      publication_date: DateTime::<Utc>::from_utc(NaiveDateTime::from_timestamp(0, 0), Utc)
+    }
+  }
+}
+enum FeedItemField {
+  Title,
+  URL,
+  PublicationDate,
+  Invalid
+}
+fn test_feeds() {
   let mut p = get_home();
   p.push("feeds");
-  // for path in std::fs::read_dir(p).unwrap() {
-  //   println!("feed: {:#?}", path);
-  // }
-  let feed0 = std::fs::read_dir(p).unwrap().next().unwrap().unwrap();
+  for path in std::fs::read_dir(p).unwrap() {
+    println!("feed: {:#?}", path);
+    print_feed_items(path.unwrap().path().to_str().unwrap())
+  }
+}
 
-  let mut reader = Reader::from_file(feed0.path().to_str().unwrap()).unwrap();
+fn print_feed_items(fname: &str) {
+  let mut reader = Reader::from_file(fname).unwrap();
   reader.trim_text(true);
 
-  let mut count = 0;
-  let mut txt = Vec::new();
   let mut buf = Vec::new();
 
-  // The `Reader` does not implement `Iterator` because it outputs borrowed data
-  // (`Cow`s)
+  let mut items: Vec<FeedItem> = Vec::new();
+  let mut current_item: Option<FeedItem> = None;
+  let mut current_field = FeedItemField::Invalid;
   loop {
     match reader.read_event(&mut buf) {
       // for triggering namespaced events, use this instead:
@@ -77,28 +103,66 @@ fn parse_some_xml() {
         // for namespaced:
         // Ok((ref namespace_value, Event::Start(ref e)))
         match e.name() {
-          b"tag1" => println!(
-            "attributes values: {:?}",
-            e.attributes().map(|a| a.unwrap().value).collect::<Vec<_>>()
-          ),
-          b"tag2" => count += 1,
-          _ => ()
+          b"item" | b"entry" => {
+            current_item = Some(Default::default());
+          }
+          b"title" => {
+            current_field = FeedItemField::Title;
+          }
+          b"link" => current_field = FeedItemField::URL,
+          b"pubDate" | b"updated" | b"published" => current_field = FeedItemField::PublicationDate,
+          _ => current_field = FeedItemField::Invalid
         }
       }
-      // unescape and decode the text event using the reader encoding
-      Ok(Event::Text(e)) => txt.push(e.unescape_and_decode(&reader).unwrap()),
-      Ok(Event::Eof) => break, // exits the loop when reaching end of file
-      Err(e) => panic!("Error at position {}: {:?}", reader.buffer_position(), e),
-      _ => () // There are several other `Event`s we do not consider here
+      Ok(Event::Text(e)) | Ok(Event::CData(e)) => match current_field {
+        FeedItemField::Title => {
+          current_item = current_item.map(|i| FeedItem {
+            title: e.unescape_and_decode(&reader).unwrap(),
+            ..i
+          });
+        }
+        FeedItemField::URL => {
+          current_item = current_item.map(|i| FeedItem {
+            url: e.unescape_and_decode(&reader).unwrap(),
+            ..i
+          });
+        }
+        FeedItemField::PublicationDate => {
+          let datestr = e.unescape_and_decode(&reader).unwrap();
+          let d = DateTime::<FixedOffset>::parse_from_rfc2822(&datestr)
+            .or_else(|_| DateTime::<FixedOffset>::parse_from_rfc3339(&datestr))
+            .unwrap() // TODO: this shit will fucking panic!
+            .with_timezone(&Utc);
+          current_item = current_item.map(|i| FeedItem {
+            publication_date: d,
+            ..i
+          });
+        }
+        _ => ()
+      },
+      Ok(Event::Eof) => break,
+      Err(e) => println!("Error at position {}: {:?}", reader.buffer_position(), e),
+      Ok(Event::End(ref e)) => match e.name() {
+        b"item" | b"entry" => {
+          if let Some(i) = current_item {
+            items.push(i);
+            current_item = None;
+          } else {
+            println!("found </item> w/o <item>!");
+          }
+        }
+        _ => ()
+      },
+      _ => ()
     }
 
-    // if we don't keep a borrow elsewhere, we can clear the buffer to keep memory
-    // usage low
     buf.clear();
   }
-  println!("got: {:?}", txt);
+  for item in items {
+    println!("item: {:?}", item);
+  }
 }
-fn main() { parse_some_xml(); }
+fn main() { test_feeds(); }
 
 fn main_() {
   let token = env::var("TELEGRAM_BOT_TOKEN").unwrap();
