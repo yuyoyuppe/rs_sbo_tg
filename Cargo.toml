@@ -2,19 +2,19 @@
 name = "rs_sbo_tg"
 version = "0.1.0"
 authors = ["yuyoyuppe <a.yuyoyuppe@gmail.com>"]
+edition = "2018"
 
 [dependencies]
 futures = "0.1"
 tokio-core = "0.1"
 tokio-curl = "0.1"
 chrono = { version = "0.4", features = ["serde"] }
-quick-xml = "0.12"
+quick-xml = "0.15"
 curl = "0.4"
 url = "1.7"
+failure = "0.1"
 
 [dependencies.telegram-bot]
 default-features = false
 features = ["curl_connector"]
-version = "0.6"
-git = "https://github.com/yuyoyuppe/telegram-bot"
-branch = "messageentity-fix"
+version = "0.6.3"

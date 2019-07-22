@@ -1,5 +1,4 @@
-extern crate telegram_bot;
-
+use crate::feed::Feed;
 use chrono::prelude::{DateTime, Utc};
 use std::time::Duration;
 
@@ -13,8 +12,8 @@ pub struct User {
 }
 
 impl Default for User {
-  fn default() -> User {
-    User {
+  fn default() -> Self {
+    Self {
       telegram_user_id:  telegram_bot::UserId::from(0),
       feeds:             Default::default(),
       categories:        Default::default(),
@@ -22,11 +21,6 @@ impl Default for User {
       cooldown:          Default::default()
     }
   }
-}
-
-#[derive(Debug)]
-pub struct Feed {
-  pub url: String
 }
 
 #[derive(Debug)]
